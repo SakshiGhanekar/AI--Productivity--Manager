@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
+import { useTasks } from '../context/TaskContext';
 import {
   X,
   Sparkles,
@@ -13,6 +14,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 
 const TaskFormModal = ({ isOpen, onClose, onSave, taskToEdit }) => {
+  const { createTask, updateTask } = useTasks();
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -84,12 +86,22 @@ const TaskFormModal = ({ isOpen, onClose, onSave, taskToEdit }) => {
         completedHours: formData.completedHours ? parseInt(formData.completedHours) : 0,
         dueDate: formData.dueDate ? formData.dueDate : null
       };
-      console.log('Sending task data:', taskData);
 
-      if (taskToEdit) {
-        await api.put(`tasks/${taskToEdit.id}`, taskData);
-      } else {
-        await api.post('tasks', taskData);
+      // Try real backend first; fall back to localStorage via context
+      try {
+        if (taskToEdit) {
+          await api.put(`tasks/${taskToEdit.id}`, taskData);
+        } else {
+          await api.post('tasks', taskData);
+        }
+      } catch (apiError) {
+        // Backend unreachable — save locally using TaskContext (localStorage)
+        console.warn('Backend unavailable, saving to localStorage:', apiError.message);
+        if (taskToEdit) {
+          await updateTask(taskToEdit.id, { ...taskData, id: taskToEdit.id });
+        } else {
+          await createTask(taskData);
+        }
       }
       onSave();
     } catch (error) {
@@ -98,6 +110,35 @@ const TaskFormModal = ({ isOpen, onClose, onSave, taskToEdit }) => {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const getLocalAiFallback = (title) => {
+    const lower = title.toLowerCase();
+    let priority = 'MEDIUM';
+    let estimatedHours = 2;
+    let description;
+
+    if (lower.includes('bug') || lower.includes('fix') || lower.includes('urgent') || lower.includes('error')) {
+      priority = 'HIGH';
+      estimatedHours = 4;
+      description = `CRITICAL HOTFIX: ${title}.\n\nImmediate action required to resolve this issue. Steps:\n1. Reproduce the bug in the local environment.\n2. Identify the root cause within the affected modules.\n3. Implement a patch and run regression testing.\n4. Push to production immediately upon passing tests.`;
+    } else if (lower.includes('api') || lower.includes('backend') || lower.includes('database') || lower.includes('schema')) {
+      priority = 'HIGH';
+      estimatedHours = 8;
+      description = `BACKEND ENGINEERING TASK: ${title}.\n\nThis task requires deep backend architectural work.\n- Update REST endpoints and ensure secure data transmission.\n- Modify database schemas using proper migration scripts.\n- Optimize query performance and implement necessary caching mechanisms.\n- Update API documentation (Swagger/OpenAPI).`;
+    } else if (lower.includes('design') || lower.includes('ui') || lower.includes('frontend') || lower.includes('css') || lower.includes('page')) {
+      priority = 'MEDIUM';
+      estimatedHours = 6;
+      description = `FRONTEND & UI IMPLEMENTATION: ${title}.\n\nFocus on delivering a pixel-perfect, responsive user interface.\n- Translate Figma/design mockups into reusable React components.\n- Ensure cross-browser compatibility and mobile responsiveness.\n- Implement smooth animations and transitions.\n- Connect UI components to Redux/Context state or backend APIs.`;
+    } else if (lower.includes('test') || lower.includes('qa') || lower.includes('docs') || lower.includes('update')) {
+      priority = 'LOW';
+      estimatedHours = 1;
+      description = `MAINTENANCE & QUALITY ASSURANCE: ${title}.\n\n- Review existing documentation and update out-of-date sections.\n- Add comprehensive unit and integration tests.\n- Perform code reviews and run automated linting tools.\n- Ensure all project standards are fully met.`;
+    } else {
+      description = `Analyze, design, and implement the necessary changes for: ${title}.\n\nKey responsibilities include:\n- Reviewing current architecture and identifying integration points.\n- Developing robust and scalable code to meet the requirements.\n- Writing unit tests and ensuring QA standards are met.\n- Deploying the changes and monitoring for performance impact.`;
+    }
+
+    return { description, priority, estimatedHours };
   };
 
   const handleAiAutoFill = async () => {
@@ -117,19 +158,27 @@ const TaskFormModal = ({ isOpen, onClose, onSave, taskToEdit }) => {
         parsedHours = parseInt(estimatedTime.replace(/[^0-9]/g, '')) || 1;
       }
 
-      const cleanDescription = (description || prev.description || "")
-        .replace(/\\n\\n/g, "\n\n")
-        .replace(/\\n/g, "\n");
-
+      setFormData(prev => {
+        const cleanDescription = (description || prev.description || "")
+          .replace(/\\n\\n/g, "\n\n")
+          .replace(/\\n/g, "\n");
+        return {
+          ...prev,
+          description: cleanDescription,
+          priority: priority || prev.priority,
+          estimatedHours: estimatedHours || parsedHours || prev.estimatedHours
+        };
+      });
+    } catch (error) {
+      // Backend unreachable (e.g. production on Vercel) — use smart local fallback
+      console.warn('Backend unavailable, using local AI fallback:', error.message);
+      const fallback = getLocalAiFallback(formData.title);
       setFormData(prev => ({
         ...prev,
-        description: cleanDescription,
-        priority: priority || prev.priority,
-        estimatedHours: estimatedHours || parsedHours || prev.estimatedHours
+        description: fallback.description,
+        priority: fallback.priority,
+        estimatedHours: fallback.estimatedHours
       }));
-    } catch (error) {
-      console.error('Error with AI auto-fill:', error);
-      alert("AI generation failed. Please try again.");
     } finally {
       setIsAiLoading(false);
     }

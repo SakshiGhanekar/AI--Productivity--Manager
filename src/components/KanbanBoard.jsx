@@ -55,13 +55,13 @@ const KanbanBoard = ({ tasks, onStatusChange, onEdit, onDelete }) => {
   };
 
   const Column = ({ title, columnId, tasks }) => (
-    <div className="flex-1 min-w-[320px] bg-zinc-50/50 dark:bg-brandCard/40 rounded-3xl p-4 border border-zinc-200/50 dark:border-zinc-800/50 flex flex-col h-full shadow-sm backdrop-blur-sm">
+    <div className="flex-1 min-w-[320px] bg-zinc-50/50 dark:bg-[#0a0a0a] rounded-3xl p-4 border border-zinc-200/50 dark:border-white/5 flex flex-col h-full shadow-sm">
       <div className="flex items-center justify-between mb-4 px-2">
         <div className="flex items-center gap-2">
           <div className={`w-2.5 h-2.5 rounded-full ${columnId === 'TODO' ? 'bg-zinc-400' : columnId === 'IN_PROGRESS' ? 'bg-primary-500 animate-pulse' : 'bg-success'}`} />
           <h3 className="font-bold text-zinc-800 dark:text-zinc-100">{title}</h3>
         </div>
-        <span className="bg-zinc-200/50 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 text-xs font-bold px-3 py-1 rounded-full border border-zinc-300/50 dark:border-zinc-700/50">
+        <span className="bg-zinc-200/50 dark:bg-white/5 text-zinc-600 dark:text-zinc-400 text-xs font-bold px-3 py-1 rounded-full border border-zinc-300/50 dark:border-white/5">
           {tasks.length}
         </span>
       </div>
@@ -80,7 +80,7 @@ const KanbanBoard = ({ tasks, onStatusChange, onEdit, onDelete }) => {
                     ref={provided.innerRef}
                     {...provided.draggableProps}
                     {...provided.dragHandleProps}
-                    className={`bg-brandCard p-5 rounded-2xl shadow-sm border group flex flex-col ${snapshot.isDragging ? 'shadow-2xl shadow-primary-500/20 border-primary-500 scale-[1.02] rotate-1 z-50' : 'border-[var(--border-color)] hover:border-primary-400/50 hover:shadow-lg transition-all duration-300'}`}
+                    className={`bg-white dark:bg-[#111] p-5 rounded-2xl shadow-sm border group flex flex-col ${snapshot.isDragging ? 'shadow-2xl shadow-primary-500/20 border-primary-500 scale-[1.02] rotate-1 z-50' : 'border-zinc-200 dark:border-white/5 hover:border-primary-400/50 hover:shadow-lg transition-all duration-300'}`}
                   >
                     <div className="flex justify-between items-start mb-3">
                       <span className={`text-[10px] font-bold px-2.5 py-1 rounded-md uppercase tracking-wider border ${getPriorityStyle(task.priority)}`}>
@@ -138,7 +138,7 @@ const KanbanBoard = ({ tasks, onStatusChange, onEdit, onDelete }) => {
                     
                     <div className="mt-4 pt-3 border-t border-[var(--border-color)] flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="w-6 h-6 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center border-2 border-white dark:border-brandCard overflow-hidden text-[10px] font-bold text-zinc-500">
+                        <div className="w-6 h-6 rounded-full bg-zinc-200 dark:bg-white/10 flex items-center justify-center border-2 border-white dark:border-[#111] overflow-hidden text-[10px] font-bold text-zinc-500">
                           <User size={12} />
                         </div>
                       </div>

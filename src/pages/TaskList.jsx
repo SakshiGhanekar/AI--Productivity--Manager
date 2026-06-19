@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
+import { useTasks } from '../context/TaskContext';
 import TaskFormModal from '../components/TaskFormModal';
 import KanbanBoard from '../components/KanbanBoard';
 import CalendarView from '../components/CalendarView';
@@ -60,7 +61,7 @@ const TaskCard = ({
           {task.priority}
         </span>
         <span className={`text-[10px] font-bold px-2.5 py-1 rounded-md uppercase tracking-wider border ${getStatusColor(task.status)}`}>
-          {task.status.replace('_', ' ')}
+          {task.status?.replace('_', ' ') || 'TODO'}
         </span>
       </div>
       <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -128,6 +129,13 @@ const TaskCard = ({
 );
 
 const TaskList = () => {
+  const {
+    tasks: contextTasks,
+    fetchTasks: contextFetchTasks,
+    deleteTask: contextDeleteTask,
+    updateTask: contextUpdateTask,
+  } = useTasks();
+
   const [tasks, setTasks] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
@@ -139,16 +147,22 @@ const TaskList = () => {
   const [priorityFilter, setPriorityFilter] = useState('ALL');
 
   useEffect(() => {
-    fetchTasks();
+    loadTasks();
   }, []);
 
-  const fetchTasks = async () => {
+  // Keep local tasks in sync with context
+  useEffect(() => {
+    setTasks(contextTasks);
+  }, [contextTasks]);
+
+  const loadTasks = async () => {
     try {
       const response = await api.get('tasks');
       setTasks(response.data.content || response.data || []);
     } catch (error) {
-      console.error('Error fetching tasks:', error);
-      setTasks([]);
+      // Backend unavailable — load from localStorage via context
+      console.warn('Backend unavailable, loading from localStorage');
+      await contextFetchTasks();
     }
   };
 
@@ -166,28 +180,30 @@ const TaskList = () => {
     if (window.confirm('Are you sure you want to delete this task?')) {
       try {
         await api.delete(`tasks/${id}`);
-        fetchTasks();
+        loadTasks();
       } catch (error) {
-        console.error('Error deleting task:', error);
+        // Backend unavailable — delete from localStorage via context
+        console.warn('Backend unavailable, deleting from localStorage');
+        await contextDeleteTask(id);
       }
     }
   };
 
   const handleStatusChange = async (id, newStatus) => {
+    // Optimistic UI update
+    setTasks(prev => prev.map(t => t.id === id ? { ...t, status: newStatus } : t));
+    const taskToUpdate = tasks.find(t => t.id === id);
     try {
-      // Local optimistic update
-      setTasks(tasks.map(t => t.id === id ? { ...t, status: newStatus } : t));
-
-      const taskToUpdate = tasks.find(t => t.id === id);
       await api.put(`tasks/${id}`, { ...taskToUpdate, status: newStatus });
     } catch (error) {
-      console.error('Error updating task status:', error);
-      fetchTasks(); // Revert on failure
+      // Backend unavailable — update localStorage via context
+      console.warn('Backend unavailable, updating localStorage');
+      await contextUpdateTask(id, { ...taskToUpdate, status: newStatus });
     }
   };
 
   const filteredTasks = tasks.filter(task => {
-    const matchesSearch = task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const matchesSearch = (task.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (task.description && task.description.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesStatus = statusFilter === 'ALL' || task.status === statusFilter;
     const matchesPriority = priorityFilter === 'ALL' || task.priority === priorityFilter;
@@ -198,7 +214,7 @@ const TaskList = () => {
 
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col dark:bg-black">
       {/* Header & Controls */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <div>
@@ -220,14 +236,14 @@ const TaskList = () => {
               placeholder="Search tasks..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-slate-100 dark:bg-brandSidebar border border-slate-200 dark:border-white/5 text-slate-900 dark:text-brandText rounded-xl focus:ring-2 focus:ring-primary-500 outline-none transition-all pl-10 py-2.5 text-sm"
+              className="w-full bg-slate-100 dark:bg-[#0d0d0d] border border-slate-200 dark:border-white/5 text-slate-900 dark:text-brandText rounded-xl focus:ring-2 focus:ring-primary-500 outline-none transition-all pl-10 py-2.5 text-sm"
             />
           </div>
           <div className="flex gap-4">
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="bg-slate-100 dark:bg-brandSidebar border border-slate-200 dark:border-white/5 text-slate-900 dark:text-brandText rounded-xl focus:ring-2 focus:ring-primary-500 outline-none transition-all py-2.5 px-3 text-sm cursor-pointer min-w-[140px]"
+              className="bg-slate-100 dark:bg-[#0d0d0d] border border-slate-200 dark:border-white/5 text-slate-900 dark:text-brandText rounded-xl focus:ring-2 focus:ring-primary-500 outline-none transition-all py-2.5 px-3 text-sm cursor-pointer min-w-[140px]"
             >
               <option value="ALL">All Status</option>
               <option value="TODO">To Do</option>
@@ -237,7 +253,7 @@ const TaskList = () => {
             <select
               value={priorityFilter}
               onChange={(e) => setPriorityFilter(e.target.value)}
-              className="bg-slate-100 dark:bg-brandSidebar border border-slate-200 dark:border-white/5 text-slate-900 dark:text-brandText rounded-xl focus:ring-2 focus:ring-primary-500 outline-none transition-all py-2.5 px-3 text-sm cursor-pointer min-w-[140px]"
+              className="bg-slate-100 dark:bg-[#0d0d0d] border border-slate-200 dark:border-white/5 text-slate-900 dark:text-brandText rounded-xl focus:ring-2 focus:ring-primary-500 outline-none transition-all py-2.5 px-3 text-sm cursor-pointer min-w-[140px]"
             >
               <option value="ALL">All Priorities</option>
               <option value="HIGH">High</option>
@@ -367,7 +383,7 @@ const TaskList = () => {
                       <div className="hidden md:flex items-center gap-6 shrink-0">
                         {/* Interactive Status Dropdown Simulation */}
                         <select
-                          value={task.status}
+                          value={task.status || 'TODO'}
                           onChange={(e) => handleStatusChange(task.id, e.target.value)}
                           className={`text-xs font-bold px-3 py-1.5 rounded-lg uppercase tracking-wider outline-none cursor-pointer border transition-colors ${getStatusColor(task.status)} hover:opacity-80`}
                         >
@@ -399,7 +415,7 @@ const TaskList = () => {
         onClose={() => setIsModalOpen(false)}
         onSave={() => {
           setIsModalOpen(false);
-          fetchTasks();
+          loadTasks();
         }}
         taskToEdit={editingTask}
       />
