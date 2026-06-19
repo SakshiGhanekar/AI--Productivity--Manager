@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Sparkles, User, BrainCircuit, Copy, Check, TerminalSquare, Command, Zap, Code, LayoutList } from 'lucide-react';
+import { Send, Sparkles, User, BrainCircuit, Copy, Check, TerminalSquare, Command, Zap, Code, LayoutList, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../api'; 
 
