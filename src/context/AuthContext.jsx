@@ -48,10 +48,13 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('name', name);
       localStorage.setItem('email', email);
       setUser({ name, email });
-      return true;
+      return { success: true };
     } catch (error) {
       console.error('Registration error:', error);
-      return false;
+      return { 
+        success: false, 
+        message: error.response?.data?.message || 'Registration failed. Please try again.' 
+      };
     }
   };
 
