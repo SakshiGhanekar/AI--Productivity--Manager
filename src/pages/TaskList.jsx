@@ -91,6 +91,7 @@ const TaskCard = ({
     <div className="mt-auto">
       {/* Task Countdown & Progress */}
       <TaskCountdown
+        createdAt={task.createdAt}
         dueDate={task.dueDate}
         estimatedHours={task.estimatedHours}
         completedHours={task.completedHours}

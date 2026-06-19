@@ -16,7 +16,7 @@ export const TaskProvider = ({ children }) => {
     setLoading(true);
     setTimeout(() => {
       let savedTasks = JSON.parse(localStorage.getItem('mockTasks') || '[]');
-      
+
       if (filters.status) {
         savedTasks = savedTasks.filter(t => t.status === filters.status);
       }
@@ -26,7 +26,7 @@ export const TaskProvider = ({ children }) => {
       if (filters.search) {
         savedTasks = savedTasks.filter(t => t.title.toLowerCase().includes(filters.search.toLowerCase()));
       }
-      
+
       setTasks(savedTasks);
       setTotalPages(1);
       setPage(0);
@@ -54,6 +54,7 @@ export const TaskProvider = ({ children }) => {
     await fetchStats();
     return newTask;
   };
+
 
   const updateTask = async (id, taskData) => {
     let savedTasks = JSON.parse(localStorage.getItem('mockTasks') || '[]');

@@ -2,161 +2,159 @@ import React, { useState, useEffect } from "react";
 import { Clock, AlertTriangle, CheckCircle } from "lucide-react";
 import { motion } from "framer-motion";
 
+/**
+ * TaskCountdown
+ * Uses createdAt + estimatedHours to count down time remaining.
+ * Falls back gracefully when data is missing.
+ */
 const TaskCountdown = ({
-  dueDate,
-  estimatedHours,
-  completedHours,
+  createdAt,
+  dueDate,       // legacy prop, ignored if createdAt is present
+  estimatedHours = 0,
+  completedHours = 0,
   status,
   showProgress = true,
 }) => {
-  const [timeLeft, setTimeLeft] = useState(null);
+  const [taskState, setTaskState] = useState(null);
 
   useEffect(() => {
-    if (!dueDate) return;
+    // DONE — no countdown needed
+    if (status === "DONE") {
+      setTaskState({ status: "DONE", text: "Task Completed" });
+      return;
+    }
 
-    const calculateTimeLeft = () => {
-      const due = new Date(dueDate).getTime();
+    // Need createdAt + estimatedHours to calculate countdown
+    const startStr = createdAt || dueDate;
+    if (!startStr || !estimatedHours || estimatedHours <= 0) {
+      // No timer data — show nothing
+      setTaskState(null);
+      return;
+    }
+
+    const updateCountdown = () => {
+      const start = new Date(startStr).getTime();
       const now = new Date().getTime();
-      const diff = due - now;
 
-      // DONE
-      if (status === "DONE") {
-        setTimeLeft({
-          status: "DONE",
-          text: "Task Completed",
-        });
+      // If date parsing failed, bail out
+      if (isNaN(start)) {
+        setTaskState(null);
         return;
       }
 
-      // PENDING (time finished)
-      if (diff <= 0) {
-        const overdueDays = Math.floor(
-          Math.abs(diff) / (1000 * 60 * 60 * 24)
-        );
+      const elapsedHours = (now - start) / (1000 * 60 * 60);
+      const remaining = estimatedHours - elapsedHours;
 
-        setTimeLeft({
-          status: "PENDING",
-          text:
-            overdueDays > 0
-              ? `Pending • ${overdueDays} Day${overdueDays > 1 ? "s" : ""
-              } Overdue`
-              : "Pending Completion",
-        });
-
-        return;
-      }
-
-      // Countdown
-      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-      const hours = Math.floor(
-        (diff % (1000 * 60 * 60 * 24)) /
-        (1000 * 60 * 60)
-      );
-      const minutes = Math.floor(
-        (diff % (1000 * 60 * 60)) /
-        (1000 * 60)
-      );
-
-      if (days > 0) {
-        setTimeLeft({
-          status: "ACTIVE",
-          text: `${days}d ${hours}h Left`,
-        });
-      } else if (hours > 0) {
-        setTimeLeft({
-          status: "ACTIVE",
-          text: `${hours}h Left`,
-        });
+      if (remaining <= 0) {
+        setTaskState({ status: "PENDING", text: "Pending Completion" });
       } else {
-        setTimeLeft({
-          status: "ACTIVE",
-          text: `${minutes}m Left`,
-        });
+        const days = Math.floor(remaining / 24);
+        const hours = Math.floor(remaining % 24);
+        const minutes = Math.floor((remaining % 1) * 60);
+
+        let text;
+        if (days > 0) {
+          text = `${days}d ${hours}h Left`;
+        } else if (hours > 0) {
+          text = `${hours}h ${minutes}m Left`;
+        } else {
+          text = `${minutes}m Left`;
+        }
+
+        setTaskState({ status: "ACTIVE", text });
       }
     };
 
-    calculateTimeLeft();
-
-    const timer = setInterval(
-      calculateTimeLeft,
-      60000
-    );
-
+    updateCountdown();
+    const timer = setInterval(updateCountdown, 60000);
     return () => clearInterval(timer);
-  }, [dueDate, status]);
+  }, [createdAt, dueDate, estimatedHours, status]);
 
-  if (!timeLeft) return null;
+  if (!taskState) return null;
 
-  let progress = 0;
+  const progress =
+    estimatedHours > 0
+      ? Math.min(100, ((completedHours || 0) / estimatedHours) * 100)
+      : 0;
 
-  if (estimatedHours > 0) {
-    progress = Math.min(
-      100,
-      ((completedHours || 0) / estimatedHours) * 100
+  // --- DONE ---
+  if (taskState.status === "DONE") {
+    return (
+      <div className="mt-3 flex items-center justify-between">
+        <div className="flex items-center gap-2 text-green-400 font-bold text-xs">
+          <CheckCircle size={13} />
+          Task Completed
+        </div>
+        <span className="px-2 py-0.5 rounded bg-green-500 text-white text-[10px] font-extrabold uppercase tracking-wider">
+          DONE
+        </span>
+      </div>
     );
   }
 
-  let colorClass = "";
-  let badgeClass = "";
-  let icon = <Clock size={12} />;
-
-  switch (timeLeft.status) {
-    case "ACTIVE":
-      colorClass = "text-warning";
-      badgeClass =
-        "bg-warning/10 text-warning border-warning/20";
-      break;
-
-    case "PENDING":
-      colorClass = "text-danger";
-      badgeClass =
-        "bg-danger text-white border-danger";
-      icon = <AlertTriangle size={12} />;
-      break;
-
-    case "DONE":
-      colorClass = "text-success";
-      badgeClass =
-        "bg-success text-white border-success";
-      icon = <CheckCircle size={12} />;
-      break;
-
-    default:
-      break;
-  }
-
-  return (
-    <div className="flex flex-col gap-2 w-full mt-2">
-      <div className="flex items-center justify-between">
-        <div
-          className={`flex items-center gap-1.5 text-xs font-bold ${colorClass}`}
-        >
-          {icon}
-          <span>{timeLeft.text}</span>
+  // --- PENDING (time expired) ---
+  if (taskState.status === "PENDING") {
+    return (
+      <div className="mt-3">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2 text-red-400 font-bold text-xs">
+            <AlertTriangle size={13} />
+            Pending Completion
+          </div>
+          <span className="px-2 py-0.5 rounded bg-red-500 text-white text-[10px] font-extrabold uppercase tracking-wider">
+            PENDING
+          </span>
         </div>
-
-        <div
-          className={`text-[9px] font-extrabold px-2 py-0.5 rounded uppercase tracking-widest border ${badgeClass}`}
-        >
-          {timeLeft.status}
-        </div>
-      </div>
-
-      {showProgress &&
-        timeLeft.status !== "DONE" && (
-          <div className="w-full bg-slate-100 dark:bg-brandSidebar rounded-full h-1.5 overflow-hidden">
-            <motion.div
-              initial={{ width: 0 }}
-              animate={{
-                width: `${progress}%`,
-              }}
-              transition={{
-                duration: 1,
-              }}
-              className="h-full rounded-full bg-danger"
-            />
+        {showProgress && (
+          <div className="w-full bg-slate-800 h-1.5 rounded overflow-hidden">
+            <div className="bg-red-500 h-1.5 rounded w-full" />
           </div>
         )}
+      </div>
+    );
+  }
+
+  // --- ACTIVE ---
+  // Color changes based on how much time has elapsed
+  const barColor = progress >= 80
+    ? "bg-red-500"
+    : progress >= 50
+      ? "bg-orange-400"
+      : "bg-green-400";
+
+  const textColor = progress >= 80
+    ? "text-red-400"
+    : progress >= 50
+      ? "text-orange-400"
+      : "text-green-400";
+
+  const badgeBg = progress >= 80
+    ? "bg-red-500/20 text-red-400 border-red-500/30"
+    : progress >= 50
+      ? "bg-orange-500/20 text-orange-400 border-orange-500/30"
+      : "bg-green-500/20 text-green-400 border-green-500/30";
+
+  return (
+    <div className="mt-3">
+      <div className="flex items-center justify-between mb-2">
+        <div className={`flex items-center gap-2 font-bold text-xs ${textColor}`}>
+          <Clock size={13} />
+          {taskState.text}
+        </div>
+        <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider border ${badgeBg}`}>
+          ACTIVE
+        </span>
+      </div>
+      {showProgress && (
+        <div className="w-full bg-slate-800 h-1.5 rounded overflow-hidden">
+          <motion.div
+            initial={{ width: 0 }}
+            animate={{ width: `${progress}%` }}
+            transition={{ duration: 1 }}
+            className={`h-1.5 rounded ${barColor}`}
+          />
+        </div>
+      )}
     </div>
   );
 };
